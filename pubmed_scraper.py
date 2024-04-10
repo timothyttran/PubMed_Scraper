@@ -30,6 +30,12 @@ Requires
     numpy
 """
 
+"""
+TODOS:
+    Update date (month and year) to better format, add specific date
+    Implement full-text retrieval
+"""
+
 import argparse
 from Bio import Entrez
 import pandas as pd
