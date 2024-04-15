@@ -10,5 +10,6 @@ This Python script retrieves PubMed article metadata and abstracts based on the 
 - Generates a CSV file containing metadata for each year's articles.
 
 ### Example Usage
+Specify search terms in "searchterms.txt
 ```bash
-python3 pubmed_scraper.py --query "mental health" --start-year 2000 --end-year 2020 --testing
+python3 pubmed_scraper.py --start-year 2000 --end-year 2020 --testing
