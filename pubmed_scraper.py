@@ -37,6 +37,7 @@ TODOS:
 """
 
 import argparse
+import ast
 from Bio import Entrez
 import pandas as pd
 import time
@@ -70,7 +71,7 @@ def build_PMID_list(queries, year, is_testing_mode):
 def search(query, year, mindate=None, maxdate=None, is_testing_mode=False):
     Entrez.email = 'timttran@uw.edu'
     query = query + ' ' + str(year)
-    retmax = 20 if is_testing_mode else 10000
+    retmax = 5 if is_testing_mode else 10000
 
     handle = Entrez.esearch(db='pubmed', 
                             sort='relevance', 
@@ -91,7 +92,7 @@ def fetch_details(id_list):
     results = Entrez.read(handle)
     return results
 
-def build_dataframe(PMID_query_mapping):
+def build_dataframe(PMID_query_mapping, dataframe):
     pmid_list = []
     title_list = []
     abstract_list = []
@@ -101,6 +102,7 @@ def build_dataframe(PMID_query_mapping):
     search_terms_list = [] # The search terms that resulted in this article
 
     PMID_list = list(PMID_query_mapping.keys())
+    existing_pmids = set(dataframe['PMID'])
 
     chunk_size = 10000
     for chunk_i in range(0, len(PMID_list), chunk_size):
@@ -108,32 +110,45 @@ def build_dataframe(PMID_query_mapping):
         papers = fetch_details(chunk)
         for i, paper in enumerate (papers['PubmedArticle']):
             pmid = paper['MedlineCitation']['PMID']
-            pmid_list.append(pmid)
-            title_list.append(paper['MedlineCitation']['Article']['ArticleTitle'])
-            try:
-                abstract_list.append(paper['MedlineCitation']['Article']['Abstract']['AbstractText'][0])
-            except:
-                abstract_list.append('No Abstract')
-            journal_list.append(paper['MedlineCitation']['Article']['Journal']['Title'])
-            language_list.append(paper['MedlineCitation']['Article']['Language'][0])
-            
-            # Get date of publication
-            day = paper['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Day')
-            month = paper['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Month')
-            year = paper['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year')
-            pubdate_list.append(format_date(day, month, year))
 
-            search_terms_list.append(PMID_query_mapping[pmid])
+            if int(pmid) not in existing_pmids:
+                pmid_list.append(pmid)
+                title_list.append(paper['MedlineCitation']['Article']['ArticleTitle'])
+                try:
+                    abstract_list.append(paper['MedlineCitation']['Article']['Abstract']['AbstractText'][0])
+                except:
+                    abstract_list.append('No Abstract')
+                journal_list.append(paper['MedlineCitation']['Article']['Journal']['Title'])
+                language_list.append(paper['MedlineCitation']['Article']['Language'][0])
+                
+                # Get date of publication
+                day = paper['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Day')
+                month = paper['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Month')
+                year = paper['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year')
+                pubdate_list.append(format_date(day, month, year))
 
-    df = pd.DataFrame(list(zip(pmid_list,
-                               title_list, 
-                               abstract_list, 
-                               journal_list, 
-                               language_list, 
-                               pubdate_list,
-                               search_terms_list)),
+                search_terms_list.append(PMID_query_mapping[pmid])
+            else:
+                # PMID already exists, just add the search term
+                row_index = dataframe.index[dataframe['PMID'] == int(pmid)][0]
+
+                existing_searchterms = ast.literal_eval(dataframe.at[row_index, 'SearchTerms'])
+                for term in PMID_query_mapping[pmid]:
+                    if term not in existing_searchterms:
+                        existing_searchterms.append(term)
+                
+                dataframe.at[row_index, 'SearchTerms'] = existing_searchterms
+
+    new_dataframe = pd.DataFrame(list(zip(pmid_list,
+                                          title_list, 
+                                          abstract_list, 
+                                          journal_list, 
+                                          language_list, 
+                                          pubdate_list,
+                                          search_terms_list)),
         columns=['PMID', 'Title', 'Abstract', 'Journal', 'Language', 'PubDate', 'SearchTerms'])
-    return df
+    
+    return pd.concat([dataframe, new_dataframe], ignore_index=True)
 
 def format_date(day, month, year):
     # Mapping of month abbreviations to numeric representation
@@ -154,9 +169,19 @@ def create_csv_year(query, year, is_testing_mode):
     id_list = build_PMID_list(query, year, is_testing_mode)
     print(f'{len(id_list)} articles in {year}')
 
-    dataframe = build_dataframe(id_list)
+    # Create CSV file if it doesn't exist
+    current_directory = os.path.dirname(os.path.realpath(__file__))
+    csv_file_path = os.path.join(current_directory, f'pubmed_{year}.csv')
 
-    dataframe.to_csv(f'pubmed_{year}.csv')# _{query.replace(" ", "_")}.csv')
+    if os.path.exists(csv_file_path):
+        dataframe = pd.read_csv(csv_file_path, index_col=0)
+    else: 
+        dataframe = pd.DataFrame(columns=['PMID', 'Title', 'Abstract', 'Journal', 'Language', 'PubDate', 'SearchTerms'])
+
+    dataframe = build_dataframe(id_list, dataframe)
+
+    print(dataframe)
+    dataframe.to_csv(f'pubmed_{year}.csv', index=True)# _{query.replace(" ", "_")}.csv')
 
 def main(queries, start_year, end_year, is_testing_mode):
     for year in range(start_year, end_year + 1):
