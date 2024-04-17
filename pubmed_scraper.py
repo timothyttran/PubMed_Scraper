@@ -95,11 +95,14 @@ def fetch_details(id_list):
 def build_dataframe(PMID_query_mapping, dataframe):
     pmid_list = []
     title_list = []
+    pubdate_list = []
     abstract_list = []
+    authors_info_list = []
     journal_list = []
     language_list = []
-    pubdate_list = []
     search_terms_list = [] # The search terms that resulted in this article
+    keyword_list = []
+    doi_list = []
 
     PMID_list = list(PMID_query_mapping.keys())
     existing_pmids = set(dataframe['PMID'])
@@ -128,6 +131,45 @@ def build_dataframe(PMID_query_mapping, dataframe):
                 pubdate_list.append(format_date(day, month, year))
 
                 search_terms_list.append(PMID_query_mapping[pmid])
+
+                # Get keywords (if exists)
+                try:
+                    keyword_elements = paper['MedlineCitation']['KeywordList'][0]
+                    single_keyword_list = []
+                    for keyword in keyword_elements:
+                        single_keyword_list.append(str(keyword))
+                    keyword_list.append(single_keyword_list)
+                except:
+                    keyword_list.append('No keywords')
+
+                # Get DOI (if exists)
+                article_id_list = paper['PubmedData']['ArticleIdList']
+                for element in article_id_list:
+                    # Check if the 'IdType' attribute is 'doi'
+                    if 'IdType' in element.attributes and element.attributes['IdType'] == 'doi':
+                        doi_list.append(str(element))
+                        break
+                else:
+                    doi_list.append("No DOI")
+
+                # Get author info and affiliations
+                try:
+                    authorList = paper['MedlineCitation']['Article']['AuthorList']
+                    for author in authorList:
+                        last_name = author['LastName']
+                        first_name = author['FirstName'] if author.get('FirstName') is not None else author['ForeName']
+                        name = f'{last_name}, {first_name}'
+
+                        affiliations = author['AffiliationInfo']
+                        affiliation_list = []
+                        for affiliation in affiliations:
+                            affiliation_list.append(affiliation['Affiliation'])
+                            print(affiliation['Affiliation'])
+
+                        authors_info_list.append({name : affiliation_list})
+                except:
+                    print(pmid)
+                    authors_info_list.append('No author info')
             else:
                 # PMID already exists, just add the search term
                 row_index = dataframe.index[dataframe['PMID'] == int(pmid)][0]
@@ -140,13 +182,16 @@ def build_dataframe(PMID_query_mapping, dataframe):
                 dataframe.at[row_index, 'SearchTerms'] = existing_searchterms
 
     new_dataframe = pd.DataFrame(list(zip(pmid_list,
+                                          doi_list,
                                           title_list, 
-                                          abstract_list, 
-                                          journal_list, 
-                                          language_list, 
+                                          abstract_list,
                                           pubdate_list,
+                                          authors_info_list,
+                                          journal_list, 
+                                          language_list,
+                                          keyword_list, 
                                           search_terms_list)),
-        columns=['PMID', 'Title', 'Abstract', 'Journal', 'Language', 'PubDate', 'SearchTerms'])
+        columns=['PMID', 'DOI', 'Title', 'Abstract', 'PubDate', 'AuthorsInfo', 'Journal', 'Language', 'KeywordList', 'SearchTerms'])
     
     return pd.concat([dataframe, new_dataframe], ignore_index=True)
 
@@ -176,7 +221,7 @@ def create_csv_year(query, year, is_testing_mode):
     if os.path.exists(csv_file_path):
         dataframe = pd.read_csv(csv_file_path, index_col=0)
     else: 
-        dataframe = pd.DataFrame(columns=['PMID', 'Title', 'Abstract', 'Journal', 'Language', 'PubDate', 'SearchTerms'])
+        dataframe = pd.DataFrame(columns=['PMID', 'DOI', 'Title', 'Abstract', 'PubDate', 'AuthorsInfo', 'Journal', 'Language', 'KeywordList', 'SearchTerms'])
 
     dataframe = build_dataframe(id_list, dataframe)
 
@@ -205,7 +250,10 @@ if __name__ == '__main__':
 
     with open(path_to_keywords) as file:
         keywords = file.readlines()
-        [search_terms.append(keyword.strip()) for keyword in keywords]
+        for keyword in keywords:
+            if keyword[:2] != '//':
+                search_terms.append(keyword.strip())
+        # [search_terms.append(keyword.strip()) for keyword in keywords]
 
     start_time = time.time()
 
