@@ -164,11 +164,9 @@ def build_dataframe(PMID_query_mapping, dataframe):
                         affiliation_list = []
                         for affiliation in affiliations:
                             affiliation_list.append(affiliation['Affiliation'])
-                            print(affiliation['Affiliation'])
 
                         authors_info_list.append({name : affiliation_list})
                 except:
-                    print(pmid)
                     authors_info_list.append('No author info')
             else:
                 # PMID already exists, just add the search term
@@ -216,7 +214,7 @@ def create_csv_year(query, year, is_testing_mode):
 
     # Create CSV file if it doesn't exist
     current_directory = os.path.dirname(os.path.realpath(__file__))
-    csv_file_path = os.path.join(current_directory, f'pubmed_{year}.csv')
+    csv_file_path = os.path.join(current_directory, f'data/pubmed_{year}.csv')
 
     if os.path.exists(csv_file_path):
         dataframe = pd.read_csv(csv_file_path, index_col=0)
@@ -226,7 +224,7 @@ def create_csv_year(query, year, is_testing_mode):
     dataframe = build_dataframe(id_list, dataframe)
 
     print(dataframe)
-    dataframe.to_csv(f'pubmed_{year}.csv', index=True)# _{query.replace(" ", "_")}.csv')
+    dataframe.to_csv(f'data/pubmed_{year}.csv', index=True)# _{query.replace(" ", "_")}.csv')
 
 def main(queries, start_year, end_year, is_testing_mode):
     for year in range(start_year, end_year + 1):
