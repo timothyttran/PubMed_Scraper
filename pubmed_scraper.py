@@ -43,6 +43,10 @@ import pandas as pd
 import time
 import os
 
+count = 0
+api_key = None # INPUT API KEY HERE
+email = 'timttran@uw.edu'
+
 def build_PMID_list(queries, year, is_testing_mode):
     PMID_query_mapping = {}
 
@@ -69,7 +73,7 @@ def build_PMID_list(queries, year, is_testing_mode):
     return PMID_query_mapping
 
 def search(query, year, mindate=None, maxdate=None, is_testing_mode=False):
-    Entrez.email = 'timttran@uw.edu'
+    Entrez.email = email
     query = query + ' ' + str(year)
     retmax = 5 if is_testing_mode else 10000
 
@@ -79,16 +83,18 @@ def search(query, year, mindate=None, maxdate=None, is_testing_mode=False):
                             mindate=mindate,
                             maxdate=maxdate,
                             retmode='xml', 
-                            term=query)
+                            term=query,
+                            api_key=api_key)
     results = Entrez.read(handle)
     return results
 
 def fetch_details(id_list):
     ids = ','.join(id_list)
-    Entrez.email = 'timttran@uw.edu'
+    Entrez.email = email
     handle = Entrez.efetch(db='pubmed',
                            retmode='xml',
-                           id=ids)
+                           id=ids,
+                           api_key=api_key)
     results = Entrez.read(handle)
     return results
 
@@ -108,11 +114,16 @@ def build_dataframe(PMID_query_mapping, dataframe):
     existing_pmids = set(dataframe['PMID'])
 
     chunk_size = 10000
+    global count
     for chunk_i in range(0, len(PMID_list), chunk_size):
         chunk = PMID_list[chunk_i:chunk_i + chunk_size]
         papers = fetch_details(chunk)
         for i, paper in enumerate (papers['PubmedArticle']):
             pmid = paper['MedlineCitation']['PMID']
+
+            count += 1
+            if count % 10000 == 0:
+                print(f'{count} articles scraped')
 
             if int(pmid) not in existing_pmids:
                 pmid_list.append(pmid)
