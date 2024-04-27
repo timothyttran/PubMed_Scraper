@@ -42,6 +42,7 @@ from Bio import Entrez
 import pandas as pd
 import time
 import os
+from full_text_extractor import create_csv_with_full_text
 
 count = 0
 api_key = None # INPUT API KEY HERE
@@ -202,7 +203,7 @@ def build_dataframe(PMID_query_mapping, dataframe):
                                           search_terms_list)),
         columns=['PMID', 'DOI', 'Title', 'Abstract', 'PubDate', 'AuthorsInfo', 'Journal', 'Language', 'KeywordList', 'SearchTerms'])
     
-    return pd.concat([dataframe, new_dataframe], ignore_index=True)
+    return pd.concat([dataframe, new_dataframe], ignore_index=True), pmid_list, abstract_list
 
 def format_date(day, month, year):
     # Mapping of month abbreviations to numeric representation
@@ -232,25 +233,30 @@ def create_csv_year(query, year, is_testing_mode):
     else: 
         dataframe = pd.DataFrame(columns=['PMID', 'DOI', 'Title', 'Abstract', 'PubDate', 'AuthorsInfo', 'Journal', 'Language', 'KeywordList', 'SearchTerms'])
 
-    dataframe = build_dataframe(id_list, dataframe)
+    dataframe, pmid_list, abstract_list = build_dataframe(id_list, dataframe)
 
     print(dataframe)
     dataframe.to_csv(f'data/pubmed_{year}.csv', index=True)# _{query.replace(" ", "_")}.csv')
+    return pmid_list, abstract_list
 
-def main(queries, start_year, end_year, is_testing_mode):
+def main(queries, start_year, end_year, is_testing_mode, get_full_text):
     for year in range(start_year, end_year + 1):
-        create_csv_year(queries, year, is_testing_mode)
+        pmid_list, abstract_list = create_csv_year(queries, year, is_testing_mode)
+        if(get_full_text):
+           create_csv_with_full_text(pmid_list, abstract_list, year)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Process start and end years.")
     parser.add_argument("--start-year", type=int, help="Start year", required=True)
     parser.add_argument("--end-year", type=int, help="End year", required=True)
     parser.add_argument("--testing", action="store_true", help="Enable testing mode")
+    parser.add_argument("--get-full-text", action="store_true", help="Get full text")
     args = parser.parse_args()
     
     start_year = args.start_year
     end_year = args.end_year
     is_testing_mode = args.testing
+    get_full_text = args.get_full_text
 
     search_terms = []
     # Get full path to searchterms.txt
@@ -266,7 +272,7 @@ if __name__ == '__main__':
 
     start_time = time.time()
 
-    main(search_terms, start_year, end_year, is_testing_mode)
+    main(search_terms, start_year, end_year, is_testing_mode, get_full_text)
 
     end_time = time.time()
     execution_time = end_time - start_time
