@@ -30,18 +30,14 @@ Requires
     pandas
 """
 
-"""
-TODOS:
-    Update date (month and year) to better format, add specific date
-    Implement full-text retrieval
-"""
-
 import argparse
 import ast
 from Bio import Entrez
 import pandas as pd
 import time
 import os
+
+count = 0
 
 def build_PMID_list(queries, year, is_testing_mode):
     PMID_query_mapping = {}
@@ -107,12 +103,19 @@ def build_dataframe(PMID_query_mapping, dataframe):
     PMID_list = list(PMID_query_mapping.keys())
     existing_pmids = set(dataframe['PMID'])
 
-    chunk_size = 10000
+    chunk_size = 30000
+
+    global count
+
     for chunk_i in range(0, len(PMID_list), chunk_size):
         chunk = PMID_list[chunk_i:chunk_i + chunk_size]
         papers = fetch_details(chunk)
         for i, paper in enumerate (papers['PubmedArticle']):
             pmid = paper['MedlineCitation']['PMID']
+
+            count += 1
+            if count % 1000 == 0:
+                print(f"{count} articles scraped")
 
             if int(pmid) not in existing_pmids:
                 pmid_list.append(pmid)
