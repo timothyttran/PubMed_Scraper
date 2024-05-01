@@ -36,6 +36,10 @@ from Bio import Entrez
 import pandas as pd
 import time
 import os
+from full_text_extractor import create_csv_with_full_text
+
+api_key = None # INPUT API KEY HERE
+email = 'timttran@uw.edu'
 
 count = 0
 
@@ -65,7 +69,7 @@ def build_PMID_list(queries, year, is_testing_mode):
     return PMID_query_mapping
 
 def search(query, year, mindate=None, maxdate=None, is_testing_mode=False):
-    Entrez.email = 'timttran@uw.edu'
+    Entrez.email = email
     query = query + ' ' + str(year)
     retmax = 5 if is_testing_mode else 10000
 
@@ -75,16 +79,18 @@ def search(query, year, mindate=None, maxdate=None, is_testing_mode=False):
                             mindate=mindate,
                             maxdate=maxdate,
                             retmode='xml', 
-                            term=query)
-    results = Entrez.read(handle)
+                            term=query,
+                            api_key=api_key)
+    results = Entrez.read(handle, validate=False)
     return results
 
 def fetch_details(id_list):
     ids = ','.join(id_list)
-    Entrez.email = 'timttran@uw.edu'
+    Entrez.email = email
     handle = Entrez.efetch(db='pubmed',
                            retmode='xml',
-                           id=ids)
+                           id=ids,
+                           api_key=api_key)
     results = Entrez.read(handle)
     return results
 
@@ -103,10 +109,8 @@ def build_dataframe(PMID_query_mapping, dataframe):
     PMID_list = list(PMID_query_mapping.keys())
     existing_pmids = set(dataframe['PMID'])
 
-    chunk_size = 30000
-
+    chunk_size = 10000
     global count
-
     for chunk_i in range(0, len(PMID_list), chunk_size):
         chunk = PMID_list[chunk_i:chunk_i + chunk_size]
         papers = fetch_details(chunk)
@@ -114,8 +118,8 @@ def build_dataframe(PMID_query_mapping, dataframe):
             pmid = paper['MedlineCitation']['PMID']
 
             count += 1
-            if count % 1000 == 0:
-                print(f"{count} articles scraped")
+            if count % 10000 == 0:
+                print(f'{count} articles scraped')
 
             if int(pmid) not in existing_pmids:
                 pmid_list.append(pmid)
@@ -194,7 +198,7 @@ def build_dataframe(PMID_query_mapping, dataframe):
                                           search_terms_list)),
         columns=['PMID', 'DOI', 'Title', 'Abstract', 'PubDate', 'AuthorsInfo', 'Journal', 'Language', 'KeywordList', 'SearchTerms'])
     
-    return pd.concat([dataframe, new_dataframe], ignore_index=True)
+    return pd.concat([dataframe, new_dataframe], ignore_index=True), pmid_list, abstract_list
 
 def format_date(day, month, year):
     # Mapping of month abbreviations to numeric representation
@@ -211,38 +215,45 @@ def format_date(day, month, year):
     # Format the date string
     return f"{month_numeric}/NA/{year}" if day is None else f"{month_numeric}/{day}/{year}"
 
-def create_csv_year(query, year, is_testing_mode):
+def create_csv_year(query, year, is_testing_mode, topic):
     id_list = build_PMID_list(query, year, is_testing_mode)
     print(f'{len(id_list)} articles in {year}')
 
     # Create CSV file if it doesn't exist
     current_directory = os.path.dirname(os.path.realpath(__file__))
-    csv_file_path = os.path.join(current_directory, f'data/pubmed_{year}.csv')
+    csv_file_path = os.path.join(current_directory, f'data/{topic}/pubmed_{year}.csv')
 
     if os.path.exists(csv_file_path):
         dataframe = pd.read_csv(csv_file_path, index_col=0)
     else: 
         dataframe = pd.DataFrame(columns=['PMID', 'DOI', 'Title', 'Abstract', 'PubDate', 'AuthorsInfo', 'Journal', 'Language', 'KeywordList', 'SearchTerms'])
 
-    dataframe = build_dataframe(id_list, dataframe)
+    dataframe, pmid_list, abstract_list = build_dataframe(id_list, dataframe)
 
     print(dataframe)
-    dataframe.to_csv(f'data/pubmed_{year}.csv', index=True)# _{query.replace(" ", "_")}.csv')
+    dataframe.to_csv(f'data/{topic}/pubmed_{year}.csv', index=True)# _{query.replace(" ", "_")}.csv')
+    return pmid_list, abstract_list
 
-def main(queries, start_year, end_year, is_testing_mode):
+def main(queries, start_year, end_year, is_testing_mode, topic, get_full_text):
     for year in range(start_year, end_year + 1):
-        create_csv_year(queries, year, is_testing_mode)
+        pmid_list, abstract_list = create_csv_year(queries, year, is_testing_mode, topic)
+        if(get_full_text):
+           create_csv_with_full_text(pmid_list, abstract_list, year)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Process start and end years.")
     parser.add_argument("--start-year", type=int, help="Start year", required=True)
     parser.add_argument("--end-year", type=int, help="End year", required=True)
     parser.add_argument("--testing", action="store_true", help="Enable testing mode")
+    parser.add_argument("--topic", type=str, help="Topic", required=True)
+    parser.add_argument("--get-full-text", action="store_true", help="Get full text")
     args = parser.parse_args()
     
     start_year = args.start_year
     end_year = args.end_year
     is_testing_mode = args.testing
+    topic = args.topic
+    get_full_text = args.get_full_text
 
     search_terms = []
     # Get full path to searchterms.txt
@@ -258,7 +269,7 @@ if __name__ == '__main__':
 
     start_time = time.time()
 
-    main(search_terms, start_year, end_year, is_testing_mode)
+    main(search_terms, start_year, end_year, is_testing_mode, topic, get_full_text)
 
     end_time = time.time()
     execution_time = end_time - start_time
