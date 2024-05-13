@@ -11,7 +11,7 @@ It accepts the following flags:
 and a txt file where each line represents the search terms
 
 Example usage:
-    python3 pubmed_scraper.py --start-year 2000 --end-year 2020 --testing
+    python3 pubmed_scraper.py --start-year 2017 --end-year 2024 --topic every_search_term --testing
 
 Contains the following functions:
     build_PMID_list: returns a list of PubMed articles ID's based on the query and year
@@ -38,7 +38,7 @@ import time
 import os
 from full_text_extractor import create_csv_with_full_text
 
-api_key = None # INPUT API KEY HERE
+api_key = '490cc436b1afeef9043ad51dd64ff070c909' # INPUT API KEY HERE
 email = 'timttran@uw.edu'
 
 count = 0
@@ -57,9 +57,9 @@ def build_PMID_list(queries, year, is_testing_mode):
 
     # PubMed limits results to 9999, divide up search into four quarters
     for query in queries:
-        for i in range(1, 11, 3): # in three month increments
+        for i in range(1, 12, 2): # in two month increments
             mindate = str(year) + '/' + str(i)
-            maxdate = str(year) + '/' + str(i + 2) # inclusive
+            maxdate = str(year) + '/' + str(i + 1) # inclusive
             results = search(query, year, mindate, maxdate)
             for PMID in results['IdList']:
                 if PMID not in PMID_query_mapping:
@@ -111,80 +111,96 @@ def build_dataframe(PMID_query_mapping, dataframe):
 
     chunk_size = 10000
     global count
+    count = 0
     for chunk_i in range(0, len(PMID_list), chunk_size):
-        chunk = PMID_list[chunk_i:chunk_i + chunk_size]
-        papers = fetch_details(chunk)
-        for i, paper in enumerate (papers['PubmedArticle']):
-            pmid = paper['MedlineCitation']['PMID']
+        max_attempts = 5  # Maximum number of attempts for each chunk
 
-            count += 1
-            if count % 10000 == 0:
-                print(f'{count} articles scraped')
+        for attempt in range(max_attempts):
+            try:
+                chunk = PMID_list[chunk_i:chunk_i + chunk_size]
+                papers = fetch_details(chunk)
+                for i, paper in enumerate(papers['PubmedArticle']):
+                    pmid = paper['MedlineCitation']['PMID']
 
-            if int(pmid) not in existing_pmids:
-                pmid_list.append(pmid)
-                title_list.append(paper['MedlineCitation']['Article']['ArticleTitle'])
-                try:
-                    abstract_list.append(paper['MedlineCitation']['Article']['Abstract']['AbstractText'][0])
-                except:
-                    abstract_list.append('No Abstract')
-                journal_list.append(paper['MedlineCitation']['Article']['Journal']['Title'])
-                language_list.append(paper['MedlineCitation']['Article']['Language'][0])
-                
-                # Get date of publication
-                day = paper['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Day')
-                month = paper['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Month')
-                year = paper['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year')
-                pubdate_list.append(format_date(day, month, year))
+                    count += 1
+                    if count % 10000 == 0:
+                        print(f'{count} articles scraped')
 
-                search_terms_list.append(PMID_query_mapping[pmid])
+                    if int(pmid) not in existing_pmids:
+                        pmid_list.append(pmid)
+                        title_list.append(paper['MedlineCitation']['Article']['ArticleTitle'])
+                        try:
+                            abstract_list.append(paper['MedlineCitation']['Article']['Abstract']['AbstractText'][0])
+                        except:
+                            abstract_list.append('No Abstract')
+                        journal_list.append(paper['MedlineCitation']['Article']['Journal']['Title'])
+                        language_list.append(paper['MedlineCitation']['Article']['Language'][0])
 
-                # Get keywords (if exists)
-                try:
-                    keyword_elements = paper['MedlineCitation']['KeywordList'][0]
-                    single_keyword_list = []
-                    for keyword in keyword_elements:
-                        single_keyword_list.append(str(keyword))
-                    keyword_list.append(single_keyword_list)
-                except:
-                    keyword_list.append('No keywords')
+                        # Get date of publication
+                        day = paper['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Day')
+                        month = paper['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Month')
+                        year = paper['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year')
+                        pubdate_list.append(format_date(day, month, year))
 
-                # Get DOI (if exists)
-                article_id_list = paper['PubmedData']['ArticleIdList']
-                for element in article_id_list:
-                    # Check if the 'IdType' attribute is 'doi'
-                    if 'IdType' in element.attributes and element.attributes['IdType'] == 'doi':
-                        doi_list.append(str(element))
-                        break
-                else:
-                    doi_list.append("No DOI")
+                        search_terms_list.append(PMID_query_mapping[pmid])
 
-                # Get author info and affiliations
-                try:
-                    authorList = paper['MedlineCitation']['Article']['AuthorList']
-                    for author in authorList:
-                        last_name = author['LastName']
-                        first_name = author['FirstName'] if author.get('FirstName') is not None else author['ForeName']
-                        name = f'{last_name}, {first_name}'
+                        # Get keywords (if exists)
+                        try:
+                            keyword_elements = paper['MedlineCitation']['KeywordList'][0]
+                            single_keyword_list = []
+                            for keyword in keyword_elements:
+                                single_keyword_list.append(str(keyword))
+                            keyword_list.append(single_keyword_list)
+                        except:
+                            keyword_list.append('No keywords')
 
-                        affiliations = author['AffiliationInfo']
-                        affiliation_list = []
-                        for affiliation in affiliations:
-                            affiliation_list.append(affiliation['Affiliation'])
+                        # Get DOI (if exists)
+                        article_id_list = paper['PubmedData']['ArticleIdList']
+                        for element in article_id_list:
+                            # Check if the 'IdType' attribute is 'doi'
+                            if 'IdType' in element.attributes and element.attributes['IdType'] == 'doi':
+                                doi_list.append(str(element))
+                                break
+                        else:
+                            doi_list.append("No DOI")
 
-                        authors_info_list.append({name : affiliation_list})
-                except:
-                    authors_info_list.append('No author info')
-            else:
-                # PMID already exists, just add the search term
-                row_index = dataframe.index[dataframe['PMID'] == int(pmid)][0]
+                        # Get author info and affiliations
+                        try:
+                            authorList = paper['MedlineCitation']['Article']['AuthorList']
+                            for author in authorList:
+                                last_name = author['LastName']
+                                first_name = author['FirstName'] if author.get('FirstName') is not None else author['ForeName']
+                                name = f'{last_name}, {first_name}'
 
-                existing_searchterms = ast.literal_eval(dataframe.at[row_index, 'SearchTerms'])
-                for term in PMID_query_mapping[pmid]:
-                    if term not in existing_searchterms:
-                        existing_searchterms.append(term)
-                
-                dataframe.at[row_index, 'SearchTerms'] = existing_searchterms
+                                affiliations = author['AffiliationInfo']
+                                affiliation_list = []
+                                for affiliation in affiliations:
+                                    affiliation_list.append(affiliation['Affiliation'])
+
+                                authors_info_list.append({name: affiliation_list})
+                        except:
+                            authors_info_list.append('No author info')
+                    else:
+                        # PMID already exists, just add the search term
+                        row_index = dataframe.index[dataframe['PMID'] == int(pmid)][0]
+
+                        existing_searchterms = ast.literal_eval(dataframe.at[row_index, 'SearchTerms'])
+                        for term in PMID_query_mapping[pmid]:
+                            if term not in existing_searchterms:
+                                existing_searchterms.append(term)
+
+                        dataframe.at[row_index, 'SearchTerms'] = existing_searchterms
+
+                # If the execution reaches here, the chunk was processed successfully
+                break
+
+            except Exception as e:
+                print(f"Error processing chunk. Attempt {attempt + 1}/{max_attempts}: {str(e)}")
+                time.sleep(20)
+                if attempt == max_attempts - 1:
+                    print(f"Max attempts reached for chunk. Skipping chunk.")
+                    break
+
 
     new_dataframe = pd.DataFrame(list(zip(pmid_list,
                                           doi_list,
@@ -258,7 +274,7 @@ if __name__ == '__main__':
     search_terms = []
     # Get full path to searchterms.txt
     current_directory = os.path.dirname(os.path.realpath(__file__))
-    path_to_keywords = os.path.join(current_directory, 'searchterms.txt')
+    path_to_keywords = os.path.join(current_directory, 'search_terms/searchterms.txt')
 
     with open(path_to_keywords) as file:
         keywords = file.readlines()

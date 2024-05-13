@@ -1,0 +1,66 @@
+// Lines starting with '//' will be ignored
+// All the search terms are divided into four different files
+Ego-dystonic sexual orientation
+Paraphilia
+Sexual fetishism
+Voyeurism
+Sexual maturation disorder
+Sexual relationship disorder
+Factitious disorder
+Factitious disorder imposed on self
+Gender dysphoria
+Intermittent explosive disorder
+Excoriation disorder
+Kleptomania
+Pyromania
+Trichotillomania
+Personality disorder
+Attention deficit hyperactivity disorder
+Conduct disorder
+Oppositional defiant disorder
+Emotional and behavioral disorders
+Separation anxiety disorder
+Movement disorder
+Stereotypic movement disorder
+Disinhibited attachment disorder
+Reactive attachment disorder
+Selective mutism
+Speech disorder
+Cluttering
+Stuttering
+Tic disorder
+Tourette syndrome
+X-linked intellectual disability
+Lujan–Fryns syndrome
+Pervasive developmental disorder
+Specific developmental disorder
+Bipolar disorder
+Bipolar I disorder
+Bipolar II disorder
+Bipolar disorder not otherwise specified
+Cyclothymia
+Depression (mood)
+Atypical depression
+Dysthymia
+Major depressive disorder
+Melancholic depression
+Seasonal affective disorder
+Mania
+Autism
+Asperger syndrome
+High-functioning autism
+Pervasive developmental disorder not otherwise specified
+Savant syndrome
+HIV-associated neurocognitive disorder
+Alzheimer's disease
+Creutzfeldt–Jakob disease
+Frontotemporal dementia
+Huntington's disease
+Mild cognitive impairment
+Parkinson's disease
+Sundowning
+Vascular dementia
+Wandering (dementia)
+Delirium
+Organic brain syndrome
+Post-concussion syndrome
