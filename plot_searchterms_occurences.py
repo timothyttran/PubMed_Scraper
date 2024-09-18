@@ -1,10 +1,21 @@
+"""
+Author: Timothy Tran
+Date: 9/18/2024
+
+This script creates:
+- a bar chart showcases the top/bottom search terms by average growth rate over a selected time period
+- top_terms_growth_rates.csv : A list of the search terms with highest average growth rate
+
+Note that due to the large number of search terms (>100), we restrict only a certain amount to show in the diagram.
+Hence the "selected_terms" global variable (can use "avoided_terms" if we want to do all terms except for some).
+"""
 import pandas as pd
 import matplotlib.pyplot as plt
 
-top_and_bottom_N_terms = 15
+top_and_bottom_N_terms = 15 # Show the top N and bottom N term in the bar graph
 
 # Read the CSV file
-df = pd.read_csv("occurrences_by_popularity.csv")
+df = pd.read_csv("occurrences_by_popularity.csv").iloc[1:, 1:]
 
 selected_terms = {"Social anxiety", "Major depressive disorder", "Neuroimaging",
                   "Clinical psychology", "Substance dependence", "School psychology",
@@ -17,7 +28,7 @@ avoided_terms = {"Pervasive developmental disorder not otherwise specified"}
 term_data = {}
 
 # Iterate over each column (year) in the DataFrame
-for year in df.columns[:-2]:
+for year in df.columns[1:-2]:
     print(year)
     # Iterate over each row in the DataFrame for the corresponding year
     for term_occurence in df[year]:
@@ -32,6 +43,7 @@ for year in df.columns[:-2]:
                 term_data[term] = {'years': [], 'occurrences': []}
             term_data[term]['years'].append(int(year))  # Convert year to int
             term_data[term]['occurrences'].append(occurrence)
+
 # Calculate the average annual growth rate for each term
 average_growth_rate = {}
 for term, data in term_data.items():
@@ -44,6 +56,19 @@ for term, data in term_data.items():
 top_terms = sorted(average_growth_rate, key=average_growth_rate.get, reverse=True)
 top_and_bottom_terms = top_terms[:top_and_bottom_N_terms] + top_terms[-top_and_bottom_N_terms:]
 rates = [average_growth_rate[term] for term in top_and_bottom_terms]
+
+# Create CSV file for a table of the top search terms and their growth rates
+rates_top_terms = [round(average_growth_rate[term], 2) for term in top_terms]
+df = pd.DataFrame({
+    'Term': top_terms,
+    'Growth Rate (%)': rates_top_terms
+})
+# Add a Rank column
+df['Rank'] = range(1, len(df) + 1)
+# Reorder columns to have Rank first
+df = df[['Rank', 'Term', 'Growth Rate (%)']]
+# Write the DataFrame to a CSV file
+df.to_csv('top_terms_growth_rates.csv', index=False)
 
 # Plot the data for each term
 for term, data in term_data.items():
@@ -59,7 +84,6 @@ plt.legend()
 plt.grid(True)
 plt.show()
 
-print("hi")
 # Plot the growth rate for the top terms in the second window
 plt.figure(figsize=(12, 8))
 plt.bar(top_and_bottom_terms, rates, color='blue')

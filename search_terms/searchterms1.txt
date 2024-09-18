@@ -1,5 +1,6 @@
 // Lines starting with '//' will be ignored
 // All the search terms are divided into four different files
+// See "Research Paper Outline" doc for a description on how these search terms were determined.
 Ego-dystonic sexual orientation
 Paraphilia
 Sexual fetishism
